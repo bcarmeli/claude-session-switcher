@@ -166,6 +166,48 @@ export class SessionManager implements vscode.Disposable {
     return [...this._sessions];
   }
 
+  /**
+   * Resolve the upload source file for a session:
+   * - Claude sessions: returns the existing .jsonl file path.
+   * - Bob sessions: serialises recent exchanges to a temp .bob.json file.
+   * Returns { filePath, cleanup } or null if the session cannot be found.
+   */
+  async exportSessionAsJson(
+    sessionId: string,
+  ): Promise<{ filePath: string; cleanup: () => void } | null> {
+    const session = this._sessions.find(s => s.sessionId === sessionId);
+    if (!session) { return null; }
+
+    if (session.source === 'claude') {
+      const filePath = this._sessionFilePaths.get(sessionId);
+      if (!filePath) { return null; }
+      return { filePath, cleanup: () => { /* nothing to clean up */ } };
+    }
+
+    // Bob session — build a minimal .bob.json envelope from DB data.
+    const exchanges = await this._getBobRecentExchanges(sessionId);
+    const envelope = {
+      session_id: sessionId,
+      harness: 'bob',
+      username: os.userInfo().username,
+      created_at: session.updatedAt.toISOString(),
+      title: session.title,
+      messages: exchanges.map(e => ({
+        role: e.role,
+        content: e.text,
+        timestamp: e.timestamp ?? new Date().toISOString(),
+      })),
+    };
+
+    const tmpFile = path.join(os.tmpdir(), `bob-session-${sessionId}.bob.json`);
+    await fs.promises.writeFile(tmpFile, JSON.stringify(envelope, null, 2), 'utf8');
+    return {
+      filePath: tmpFile,
+      cleanup: () => { try { fs.unlinkSync(tmpFile); } catch { /* ignore */ } },
+    };
+  }
+
+
   async getRecentExchanges(sessionId: string): Promise<MessageExchange[]> {
     const filePath = this._sessionFilePaths.get(sessionId);
     if (!filePath) { return []; }

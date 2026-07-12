@@ -8,11 +8,19 @@
     "type": "git",
     "url": "https://github.com/eranra/claude-session-switcher"
   },
-  "engines": { "vscode": "^1.64.0" },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.64.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
-  "extensionDependencies": ["Anthropic.claude-code"],
+  "extensionDependencies": [
+    "Anthropic.claude-code"
+  ],
   "contributes": {
     "viewsContainers": {
       "secondarySidebar": [
@@ -42,8 +50,23 @@
         "command": "claudeSessionSwitcher.newSession",
         "title": "New Claude Session",
         "category": "Claude Session Switcher"
+      },
+      {
+        "command": "claudeSessionSwitcher.uploadToReckon",
+        "title": "Upload Session to reckon",
+        "category": "Claude Session Switcher"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Claude Session Switcher",
+      "properties": {
+        "reckon.uploadScriptPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Absolute path to `upload_session.py` in your local reckon repository clone.\n\nExample: `/Users/you/workarea/Python/recon/reckon/scripts/upload_session.py`"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

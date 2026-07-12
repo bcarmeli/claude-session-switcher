@@ -161,6 +161,9 @@
       { label: 'Copy session ID', action: function () {
           vscodeApi.postMessage({ type: 'copyToClipboard', text: session.sessionId });
       }},
+      { label: 'Upload to reckon', action: function () {
+          vscodeApi.postMessage({ type: 'uploadToReckon', sessionId: session.sessionId });
+      }},
     ];
 
     items.forEach(function (itemDef) {

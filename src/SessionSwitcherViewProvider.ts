@@ -151,6 +151,12 @@ export class SessionSwitcherViewProvider implements vscode.WebviewViewProvider, 
             });
             break;
           }
+          case 'uploadToReckon': {
+            const sessionId = message.sessionId as string | undefined;
+            if (!sessionId) { break; }
+            void this._uploadSessionToReckon(sessionId);
+            break;
+          }
           case 'copyToClipboard': {
             const text = message.text as string | undefined;
             if (typeof text === 'string') {
@@ -334,6 +340,66 @@ export class SessionSwitcherViewProvider implements vscode.WebviewViewProvider, 
     } catch {
       return 'foreign-failed';
     }
+  }
+
+  private async _uploadSessionToReckon(sessionId: string): Promise<void> {
+    const config = vscode.workspace.getConfiguration('reckon');
+    const scriptPath: string = config.get('uploadScriptPath') ?? '';
+    if (!scriptPath || !fs.existsSync(scriptPath)) {
+      // Script not configured or not found — fail silently.
+      console.log('[reckon] upload_session.py not found (reckon.uploadScriptPath:', scriptPath || '(unset)', ')');
+      return;
+    }
+
+    const exported = await this._sessionManager.exportSessionAsJson(sessionId);
+    if (!exported) {
+      void vscode.window.showErrorMessage('reckon: could not resolve session file.');
+      return;
+    }
+
+    const session = this._sessionManager.getSessions().find(s => s.sessionId === sessionId);
+    const source = session?.source ?? 'other';
+    const slug = this._slugify(session?.title ?? sessionId);
+
+    void vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'reckon: uploading session…',
+        cancellable: false,
+      },
+      () =>
+        new Promise<void>(resolve => {
+          execFile(
+            'python3',
+            [scriptPath, exported.filePath, '--source', source, '--slug', slug],
+            { timeout: 60_000 },
+            (err, stdout, stderr) => {
+              exported.cleanup();
+              if (err) {
+                void vscode.window.showErrorMessage(
+                  `reckon: upload failed — ${(stderr || String(err)).trim()}`,
+                );
+              } else {
+                void vscode.window.showInformationMessage('reckon: session uploaded ✓');
+                if (stdout.trim()) {
+                  console.log('[reckon upload]', stdout.trim());
+                }
+              }
+              resolve();
+            },
+          );
+        }),
+    );
+  }
+
+  private _slugify(text: string): string {
+    return (
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 60) || 'session'
+    );
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
